@@ -26,19 +26,85 @@ prac %>%
 # Conflict Data ------------------------------------------------------
 
 # get data
-prac <- fromJSON('https://ucdpapi.pcr.uu.se/api/gedevents/17.2?pagesize=10000&StartDate=2010-01-01&EndDate=2015-12-31',
-                 simplifyDataFrame = simplifyVector)
+prac <- fromJSON('https://ucdpapi.pcr.uu.se/api/gedevents/17.2?pagesize=10000&StartDate=2010-01-01&EndDate=2015-12-31')
 
 # extract results list
 result <- prac$Result
 
-# Take first element in list to initalize data.frame
-z <- data.frame(result[[1]])
+# Null to NA function to apply through
+null_to_na <- function(x) {
+    
+    for(i in 1:length(x))
+        if(is.null(x[[i]])){
+            x[[i]] <- NA
+        } else {
+            next
+        }
+    return(x)
+    
+}
+
+# Set nulls to NA
+result <- lapply(result, null_to_na)
+
+# Initialize data frame with first element of results
+c_df<- data.frame(result[[1]])
 
 # Add the rest w/loop
 for (i in 2:length(result)){
-    z <- rbind(z, data.frame(result[[i]]))
+    c_df <- rbind(c_df, data.frame(result[[i]]))
 }
+
+# get next URL
+URL <- prac$NextPageUrl
+url_list <- c(URL, rep(NA, 38))
+
+# Discovered there's 39 pages, or so it seems, should list URL's
+# it would be best if I figured out what the last 'URL' was and
+# ifelsed on that. 
+for( i  in 2:39){
+    listing <- fromJSON(URL)
+    url_list[i] <- listing$NextPageUrl
+    Sys.sleep(.2)
+    URL <- listing$NextPageUrl
+}
+
+url_list <- url_list[1:39]
+# This function should take a vector of URL's that return JSON, and
+# give back data frames of data
+get_all_data <- function(x) {
+    # get Data
+    data <- fromJSON(x)
+    
+    # subset Data
+    data <- data$Result
+    
+    # Turn Nulls to NA's
+    data <- lapply(data, null_to_na)
+    
+    # Initialize data frame with first element of results
+    c_df<- data.frame(result[[1]])
+    
+    # Add the rest w/loop
+    for (i in 2:length(result)){
+        c_df <- rbind(c_df, data.frame(result[[i]]))
+    }
+    
+    return(c_df)
+}
+
+# lappy over our URL with get_all_data
+yes <- lapply(url_list, get_all_data)
+
+# Combine lists
+yes1 <- bind_rows(yes, .id = "column_label")
+# Doesn't work, my data is repeated
+
+# Fast Exploration --------------------------------------------------------
+
+# USA involved
+View(yes1 %>%
+    filter(side_b_new_id == 769 | side_a_new_id == 769))
 
 
 # Mapping Conflict Data ---------------------------------------------------
@@ -56,4 +122,5 @@ ggplot(data = world) +
     xlab('Longitude') +
     ylab('Latitude') +
     ggtitle('World Map', subtitle = paste0("(", length(unique(world$geounit)), " countries)"))
+
 
