@@ -101,7 +101,6 @@ yes <- lapply(url_list, get_all_data)
 # Collapse list of df's to single df
 yes <- bind_rows(yes, .id = "column_label")
 
-
 # Fast Exploration --------------------------------------------------------
 
 # USA involved
