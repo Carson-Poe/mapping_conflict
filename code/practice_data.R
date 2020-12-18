@@ -69,7 +69,9 @@ for( i  in 2:39){
     URL <- listing$NextPageUrl
 }
 
-url_list <- url_list[1:39]
+# Manually subset
+url_list <- url_list[!is.na(url_list)]
+
 # This function should take a vector of URL's that return JSON, and
 # give back data frames of data
 get_all_data <- function(x) {
@@ -83,11 +85,11 @@ get_all_data <- function(x) {
     data <- lapply(data, null_to_na)
     
     # Initialize data frame with first element of results
-    c_df<- data.frame(result[[1]])
+    c_df<- data.frame(data[[1]])
     
     # Add the rest w/loop
-    for (i in 2:length(result)){
-        c_df <- rbind(c_df, data.frame(result[[i]]))
+    for (i in 2:length(data)){
+        c_df <- rbind(c_df, data.frame(data[[i]]))
     }
     
     return(c_df)
@@ -96,16 +98,18 @@ get_all_data <- function(x) {
 # lappy over our URL with get_all_data
 yes <- lapply(url_list, get_all_data)
 
-# Combine lists
-yes1 <- bind_rows(yes, .id = "column_label")
-# Doesn't work, my data is repeated
+# Collapse list of df's to single df
+yes <- bind_rows(yes, .id = "column_label")
+
 
 # Fast Exploration --------------------------------------------------------
 
 # USA involved
-View(yes1 %>%
+View(yes %>%
     filter(side_b_new_id == 769 | side_a_new_id == 769))
 
+# ------------- It doesn't appear to be all USA options. Needs to do 
+# ------------- more exploring. 
 
 # Mapping Conflict Data ---------------------------------------------------
 
