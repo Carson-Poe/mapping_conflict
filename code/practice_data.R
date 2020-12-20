@@ -113,10 +113,15 @@ save(c_df, file = "data/conflict_16.Rds")
 
 ## Data has been saved above, now if we want to reload and explore our data,
 
-data1 <- load('data/conflict_10_15.Rds')
-data2 <- load('data/conflict_16.Rds')
+load('data/conflict_10_15.Rds')
 
-c_df <- rbind(data1, data2)
+c_df1 <- c_df
+
+load('data/conflict_16.Rds')
+
+c_df <- rbind(c_df1, c_df)
+
+rm(c_df1)
 
 # Fast Exploration --------------------------------------------------------
 
