@@ -26,7 +26,7 @@ prac %>%
 # Conflict Data ------------------------------------------------------
 
 # get data
-prac <- fromJSON('https://ucdpapi.pcr.uu.se/api/gedevents/17.2?pagesize=10000&StartDate=2010-01-01&EndDate=2015-12-31')
+prac <- fromJSON('https://ucdpapi.pcr.uu.se/api/gedevents/17.2?pagesize=10000&StartDate=2016-01-01&EndDate=2020-12-18')
 
 # extract results list
 result <- prac$Result
@@ -57,19 +57,23 @@ for (i in 2:length(result)){
 
 # get next URL
 URL <- prac$NextPageUrl
-url_list <- c(URL, rep(NA, 38))
+url_list <- c(URL, rep(NA, 50))
 
 # Discovered there's 39 pages, or so it seems, should list URL's
 # it would be best if I figured out what the last 'URL' was and
 # ifelsed on that. 
 for( i  in 2:39){
     listing <- fromJSON(URL)
-    url_list[i] <- listing$NextPageUrl
-    Sys.sleep(.2)
-    URL <- listing$NextPageUrl
+    if (listing$NextPageUrl != ""){
+        url_list[i] <- listing$NextPageUrl
+        Sys.sleep(.2)
+        URL <- listing$NextPageUrl
+    } else {
+        break
+    }
 }
 
-# Manually subset
+# Manually subset to remove NA's
 url_list <- url_list[!is.na(url_list)]
 
 # This function should take a vector of URL's that return JSON, and
@@ -99,7 +103,20 @@ get_all_data <- function(x) {
 yes <- lapply(url_list, get_all_data)
 
 # Collapse list of df's to single df
-yes <- bind_rows(yes, .id = "column_label")
+yes <- bind_rows(yes)
+
+# Add page 1
+c_df <- rbind(c_df, yes)
+
+#
+save(c_df, file = "data/conflict_16.Rds")
+
+## Data has been saved above, now if we want to reload and explore our data,
+
+data1 <- load('data/conflict_10_15.Rds')
+data2 <- load('data/conflict_16.Rds')
+
+c_df <- rbind(data1, data2)
 
 # Fast Exploration --------------------------------------------------------
 
@@ -107,7 +124,7 @@ yes <- bind_rows(yes, .id = "column_label")
 View(yes %>%
     filter(side_b_new_id == 769 | side_a_new_id == 769))
 
-# ------------- It doesn't appear to be all USA options. Needs to do 
+# ------------- It doesn't appear to be only USA options. Needs to do 
 # ------------- more exploring. 
 
 # Mapping Conflict Data ---------------------------------------------------
