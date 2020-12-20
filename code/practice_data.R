@@ -23,7 +23,8 @@ prac %>%
     filter(as.numeric(prac$DailyPrecipitation) > 2) 
 
 
-# Conflict Data ------------------------------------------------------
+
+# Retrieving and Cleaning Data -------------------------------------------
 
 # get data
 prac <- fromJSON('https://ucdpapi.pcr.uu.se/api/gedevents/17.2?pagesize=10000&StartDate=2016-01-01&EndDate=2020-12-18')
@@ -111,7 +112,10 @@ c_df <- rbind(c_df, yes)
 #
 save(c_df, file = "data/conflict_16.Rds")
 
-## Data has been saved above, now if we want to reload and explore our data,
+
+# Loading Data ------------------------------------------------------------
+
+# Data saved in steps above, now if we want to load said data and explore...
 
 load('data/conflict_10_15.Rds')
 
@@ -131,6 +135,8 @@ View(yes %>%
 
 # ------------- It doesn't appear to be only USA options. Needs to do 
 # ------------- more exploring. 
+
+str(c_df)
 
 # Mapping Conflict Data ---------------------------------------------------
 
