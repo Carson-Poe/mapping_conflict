@@ -27,7 +27,7 @@ prac %>%
 # Retrieving and Cleaning Data -------------------------------------------
 
 # get data
-prac <- fromJSON('https://ucdpapi.pcr.uu.se/api/gedevents/17.2?pagesize=10000&StartDate=2016-01-01&EndDate=2020-12-18')
+prac <- fromJSON('https://ucdpapi.pcr.uu.se/api/gedevents/20.1?pagesize=1000&StartDate=2019-01-01')
 
 # extract results list
 result <- prac$Result
@@ -110,12 +110,15 @@ yes <- bind_rows(yes)
 c_df <- rbind(c_df, yes)
 
 #
-save(c_df, file = "data/conflict_16.Rds")
+save(c_df, file = "data/conflict_19.Rds")
+
 
 
 # Loading Data ------------------------------------------------------------
 
 # Data saved in steps above, now if we want to load said data and explore...
+
+# 2010 - 2016
 
 load('data/conflict_10_15.Rds')
 
@@ -127,16 +130,29 @@ c_df <- rbind(c_df1, c_df)
 
 rm(c_df1)
 
+# 2019 only
+
+load('data/conflict_19.Rds')
+
+
 # Fast Exploration --------------------------------------------------------
 
 # USA involved
-View(yes %>%
+View(c_df %>%
     filter(side_b_new_id == 769 | side_a_new_id == 769))
 
-# ------------- It doesn't appear to be only USA options. Needs to do 
-# ------------- more exploring. 
+View(c_df)
 
-str(c_df)
+# ------------- Okay, I need to find the readme that has the documenation 
+# of what each variable means.
+
+names(c_df)
+
+ggplot(c_df, aes(group = type_of_violence, y=best, x = date_end)) +
+    geom_line()
+
+ggplot(c_df, aes(group = type_of_violence, y=best, x = date_end)) +
+    geom_bar()
 
 # Mapping Conflict Data ---------------------------------------------------
 
