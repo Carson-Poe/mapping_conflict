@@ -10,6 +10,8 @@ theme_set(theme_bw())
 library(rnaturalearth)
 library(rnaturalearthdata)
 library(rgeos)
+library(viridis)
+library(skimr)
 
 
 # NOAA Weather Station Data -----------------------------------------------
@@ -143,16 +145,28 @@ View(c_df %>%
 
 View(c_df)
 
+skim(c_df)
+
 # ------------- Okay, I need to find the readme that has the documenation 
 # of what each variable means.
+
+# Need type of to be as factor
+c_df$type_of_violence <- as.factor(c_df$type_of_violence)
 
 names(c_df)
 
 ggplot(c_df, aes(group = type_of_violence, y=best, x = date_end)) +
     geom_line()
 
-ggplot(c_df, aes(group = type_of_violence, y=best, x = date_end)) +
-    geom_bar()
+ggplot(c_df, aes(group = type_of_violence, y=best, x = type_of_violence, fill = type_of_violence)) +
+    geom_bar(stat = 'identity') +
+    scale_color_viridis(discrete = TRUE, option = "D") +
+    scale_fill_viridis(discrete = TRUE)
+
+ggplot(c_df, aes(group = type_of_violence, y=best, x = type_of_violence, fill = type_of_violence)) +
+    geom_boxplot(stat = 'identity') +
+    scale_color_viridis(discrete = TRUE, option = "D") +
+    scale_fill_viridis(discrete = TRUE)
 
 # Mapping Conflict Data ---------------------------------------------------
 
