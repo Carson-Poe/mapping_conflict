@@ -12,6 +12,7 @@ library(rnaturalearthdata)
 library(rgeos)
 library(viridis)
 library(skimr)
+library(GGally)
 
 
 # NOAA Weather Station Data -----------------------------------------------
@@ -143,18 +144,38 @@ load('data/conflict_19.Rds')
 View(c_df %>%
     filter(side_b_new_id == 769 | side_a_new_id == 769))
 
+# Look at all
 View(c_df)
 
+# Wow, this function is nice
 skim(c_df)
 
-# ------------- Okay, I need to find the readme that has the documenation 
-# of what each variable means.
-
-# Need type of to be as factor
-c_df$type_of_violence <- as.factor(c_df$type_of_violence)
-
+# And this 
 names(c_df)
 
+c_df %>%
+    mutate(region = factor(region))
+
+unique(c_df$region)
+
+# This ggpairs fucntion is great, can really throw stuff in and see what sticks
+c_df %>%
+    select(type_of_violence, region, best) %>%
+    filter(best < 100) %>%
+    ggpairs(mapping = aes(color = region))
+
+# Need type of to be factor
+c_df$type_of_violence <- as.factor(c_df$type_of_violence)
+
+# This is beautiful. Easy ggplot for histogram of deaths, w/ Region Facet
+c_df %>%
+    filter(best <50) %>%
+    ggplot(aes(x = best)) +
+    geom_histogram(bins = 50, aes(fill=region)) + 
+    facet_wrap(~region) +
+    xlab('Deaths Best Estimate')
+
+# Practice Plots
 ggplot(c_df, aes(group = type_of_violence, y=best, x = date_end)) +
     geom_line()
 
