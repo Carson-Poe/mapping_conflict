@@ -13,7 +13,8 @@ library(rgeos)
 library(viridis)
 library(skimr)
 library(GGally)
-
+library(maps)
+library(scales)
 
 # NOAA Weather Station Data -----------------------------------------------
 
@@ -150,6 +151,71 @@ View(c_df)
 # Wow, this function is nice
 skim(c_df)
 
+# This is looking better already. Starting to see some interesting stuff. Ish
+# Way better since I've been watching Julia Silge and David Robinson
+# Get count by country
+c_df %>% 
+    select(country, best, date_start, region, best) %>% 
+    add_count(country) %>% 
+    filter(n > 100) %>% 
+    ggplot(aes(date_start, best, color = country)) +
+    geom_line() +
+    facet_wrap(~country, scales = 'free_y')
+
+# The problem with the above graph is it does up and down lines, like, the 
+# 'best estimate' isn't a great variable to plot here, we could do boxplots
+
+c_df %>% 
+    select(country, best, date_start, region, best) %>% 
+    add_count(country) %>% 
+    filter(n > 100, best < 300) %>% 
+    ggplot(aes(y = best, x = country)) +
+    geom_boxplot() +
+    labs(y = 'Deaths', x = 'Country') +
+    facet_wrap(~country, scales = 'free')
+
+# That looks a bit better, also, it seems like plotting by best isn't a great idea
+# maybe average by country, first attempt didn't work, I couldn't pass the mutate
+# into the geom_ properally, I had multi rows per country. I wonder, gggplot might
+# not allow for grouped to be passed in. 
+# Solution was to create a new df, though I probably could have done all the summarize stuff
+# down there. Actually, lets try that
+
+# Okay, really cool plot. Doesn't show st dev, but shows average deaths, plus sample
+# size, ordered by most
+c_df %>% 
+    select(country, best, date_start, region, best) %>% 
+    add_count(country) %>% 
+    filter(n > 100) %>% 
+    group_by(country) %>% 
+    mutate(average = (sum(best)/n), sum_deaths = sum(best)) %>% 
+    select(-best, -date_start) %>% 
+    summarise(region = unique(region),
+          n = max(n), 
+          average = max(average),
+          sum_deaths = max(sum_deaths)) %>% 
+    mutate(country = fct_reorder(country, -average)) %>% 
+    ggplot(aes(country, average, fill = country))+
+    geom_col() +
+    geom_text(aes(label = paste0('n= ', n), angle = 90), hjust = 'top') +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position =  'none') +
+    labs(x = 'Country', y = 'Average Deaths per Violent Encounter 2019') +
+    scale_y_continuous( n.breaks = 8)
+
+
+
+?scale_y_continuous()
+avg_tots_by_country %>% group_by(country) %>%
+    summarise(region = unique(region),
+              n = max(n), 
+              average = max(average),
+              sum_deaths = max(sum_deaths)) %>% 
+    ggplot(aes(country, average, fill = country))+
+        geom_col() +
+        theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position =  'none') +
+        labs(x = 'Country', y = 'Average Deaths per Violent Encounter 2019')
+vignette("ggplot2-specs")
+s
 # And this 
 names(c_df)
 
@@ -205,4 +271,27 @@ ggplot(data = world) +
     ylab('Latitude') +
     ggtitle('World Map', subtitle = paste0("(", length(unique(world$geounit)), " countries)"))
 
+# Using world map from ggplot
 
+names(c_df)
+
+world_data <- map_data('world')
+fortify(world_data)
+
+library(RColorBrewer)
+library(ggiraph)
+unique(c_df$type_of_violence)
+
+# Try some of those Shiny world maps
+# No wait
+str(c_df)
+
+conflict_plot <- c_df %>%
+    select(country, type_of_violence, latitude, longitude, best) %>% 
+    mutate(type_of_violence = factor(type_of_violence))
+
+conflict_plot %>% 
+    ggplot() +
+    geom_polygon_interactive(size = .1, aes(x = longitude, y = latitude, size = best,
+                                            tooltip = country)) +
+    scale_fill_gradientn(colors = brewer.pal(3, 'RdBu'))
