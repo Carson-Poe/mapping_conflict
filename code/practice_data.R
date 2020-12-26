@@ -7,14 +7,11 @@ library(r2d3)
 library(sf)
 library(ggplot2)
 theme_set(theme_bw())
-library(rnaturalearth)
-library(rnaturalearthdata)
-library(rgeos)
-library(viridis)
 library(skimr)
 library(GGally)
 library(maps)
 library(scales)
+library(gganimate)
 
 # NOAA Weather Station Data -----------------------------------------------
 
@@ -136,7 +133,7 @@ rm(c_df1)
 
 # 2019 only
 
-load('data/conflict_19.Rds')
+load("C:/Users/Car/Desktop/Messing Around/Exploration Mapping/mapping_conflict/data/conflict_19.Rds")
 
 
 # Fast Exploration --------------------------------------------------------
@@ -203,19 +200,6 @@ c_df %>%
     scale_y_continuous( n.breaks = 8)
 
 
-
-?scale_y_continuous()
-avg_tots_by_country %>% group_by(country) %>%
-    summarise(region = unique(region),
-              n = max(n), 
-              average = max(average),
-              sum_deaths = max(sum_deaths)) %>% 
-    ggplot(aes(country, average, fill = country))+
-        geom_col() +
-        theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position =  'none') +
-        labs(x = 'Country', y = 'Average Deaths per Violent Encounter 2019')
-vignette("ggplot2-specs")
-s
 # And this 
 names(c_df)
 
@@ -257,30 +241,6 @@ ggplot(c_df, aes(group = type_of_violence, y=best, x = type_of_violence, fill = 
 
 # Mapping Conflict Data ---------------------------------------------------
 
-# Working from here - https://www.r-spatial.org/r/2018/10/25/ggplot2-sf.html
-
-# Create globe
-world <- ne_countries(scale = "medium", returnclass = "sf")
-names(world)
-world$geounit
-# Pass it to ggplot
-ggplot(data = world) +
-    geom_sf(aes(fill = pop_est)) +
-    coord_sf() +
-    xlab('Longitude') +
-    ylab('Latitude') +
-    ggtitle('World Map', subtitle = paste0("(", length(unique(world$geounit)), " countries)"))
-
-# Using world map from ggplot
-
-names(c_df)
-
-world_data <- map_data('world')
-fortify(world_data)
-
-library(RColorBrewer)
-library(ggiraph)
-unique(c_df$type_of_violence)
 
 # Try some of those Shiny world maps
 # No wait
@@ -295,3 +255,93 @@ conflict_plot %>%
     geom_polygon_interactive(size = .1, aes(x = longitude, y = latitude, size = best,
                                             tooltip = country)) +
     scale_fill_gradientn(colors = brewer.pal(3, 'RdBu'))
+
+
+
+# OMG THIS IS IT. THE WORLD MAP! Thank you JULIA SILGE! 
+world <- map_data('world')
+View(c_df)
+ggplot() +
+    geom_map(data = world, map = world, aes(long, lat, map_id = region), 
+             color = 'white', fill = 'gray50', alpha = .2) +
+    geom_point(data = c_df, aes(longitude, latitude, color = as.factor(type_of_violence)), 
+               alpha = .8) +
+    theme() +
+    scale_color_brewer(palette = 'Set1')
+
+# Size is deaths, world map
+world <- map_data('world')
+View(c_df)
+ggplot() +
+    geom_map(data = world, map = world, aes(long, lat, map_id = region), 
+             color = 'white', fill = 'gray50', alpha = .2) +
+    geom_point(data = c_df, aes(longitude, latitude, color = as.factor(type_of_violence),
+                                size = best), 
+               alpha = .8) +
+    theme() +
+    scale_color_brewer(palette = 'Set1')
+
+# Now to map over time, see the David Robinson big mac series
+# Should be the same
+
+big_mac %>%
+    filter(!is.na(gdp_dollar)) %>% 
+    ggplot(aes(gdp_dollar, usd_adjusted))+
+    geom_point() +
+    geom_text_repel(aes(label = country)) +
+    geom_smooth(method = 'lm') + 
+    transition_time(date) +
+    labs(x = 'GDP per capita (dollars)', 
+         y = 'Raw Big Max Index relative to USD',
+         title = '{ frame_time }')
+
+# tibble
+c_df <- c_df %>% 
+    as_tibble()
+
+# January only, change to dates
+c_jan_19 <- c_df %>% 
+    mutate(date_start = as.Date(date_start), date_end = as.Date(date_end)) %>% 
+    filter(date_start <= '2019-1-31' & date_start >= '2019-1-1') 
+
+# Create world data set
+world <- map_data('world')
+
+# OMG It's working, had to group by ID becuase it was grouping by some other
+# factor. Now can we make our transitions smoother. As well as go moth to month?
+
+z <- ggplot() +
+    geom_map(data = world, map = world, aes(long, lat, map_id = region), 
+             color = 'white', fill = 'gray50', alpha = .2) +
+    geom_point(data = c_jan_19, aes(longitude, latitude, group = id, color = type_of_violence), 
+               alpha = .8) +
+    scale_color_brewer(palette = 'Set1') +
+    transition_time(date_start) +
+    theme(legend.background = element_rect(fill = 'grey50', 
+                                           size = .5, linetype = 2)) +
+    labs(x = 'Longitude', 
+         y = 'Latitude', 
+         title = '{ frame_time }') +
+    enter_fade()
+    
+animate(z, height = 800, width = 1000, nframes = 100)
+
+# Really love this plot, how can we immitate?
+data <- data.frame(
+    x = 1:10,
+    y = runif(10),
+    begin = runif(10, 1, 100),
+    length = runif(10, 5, 20),
+    enter = runif(10, 5, 10),
+    exit = runif(10, 5, 10)
+)
+
+anim <- ggplot(data, aes(x, y)) +
+    geom_col() +
+    transition_events(start = begin,
+                      end = begin + length,
+                      enter_length = enter,
+                      exit_length = exit) +
+    enter_grow() +
+    exit_drift(x_mod = 11) +
+    exit_fade()
