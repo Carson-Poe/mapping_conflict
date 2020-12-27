@@ -1,4 +1,5 @@
 
+extrafont::loadfonts(device="win")
 library(tidyverse)
 library(xlsx)
 library(httr)
@@ -12,18 +13,9 @@ library(GGally)
 library(maps)
 library(scales)
 library(gganimate)
-
-# NOAA Weather Station Data -----------------------------------------------
-
-# Read NOAA data
-prac <- read.csv('data/shasta19.csv')
-
-# View all days where precipitation was greater than 2
-prac %>%
-    select(DATE, DailyPrecipitation) %>%
-    filter(as.numeric(prac$DailyPrecipitation) > 2) 
-
-
+library(plotly)
+library(ggplot2)
+library(sf)
 
 # Retrieving and Cleaning Data -------------------------------------------
 
@@ -200,14 +192,6 @@ c_df %>%
     scale_y_continuous( n.breaks = 8)
 
 
-# And this 
-names(c_df)
-
-c_df %>%
-    mutate(region = factor(region))
-
-unique(c_df$region)
-
 # This ggpairs fucntion is great, can really throw stuff in and see what sticks
 c_df %>%
     select(type_of_violence, region, best) %>%
@@ -241,23 +225,7 @@ ggplot(c_df, aes(group = type_of_violence, y=best, x = type_of_violence, fill = 
 
 # Mapping Conflict Data ---------------------------------------------------
 
-
-# Try some of those Shiny world maps
-# No wait
-str(c_df)
-
-conflict_plot <- c_df %>%
-    select(country, type_of_violence, latitude, longitude, best) %>% 
-    mutate(type_of_violence = factor(type_of_violence))
-
-conflict_plot %>% 
-    ggplot() +
-    geom_polygon_interactive(size = .1, aes(x = longitude, y = latitude, size = best,
-                                            tooltip = country)) +
-    scale_fill_gradientn(colors = brewer.pal(3, 'RdBu'))
-
-
-
+# One is state based, two is non-state based, three is one sided
 # OMG THIS IS IT. THE WORLD MAP! Thank you JULIA SILGE! 
 world <- map_data('world')
 View(c_df)
@@ -266,34 +234,25 @@ ggplot() +
              color = 'white', fill = 'gray50', alpha = .2) +
     geom_point(data = c_df, aes(longitude, latitude, color = as.factor(type_of_violence)), 
                alpha = .8) +
-    theme() +
+    theme(legend.title = element_text('Type of Violence')) +
+    labs(title = 'Global Violence')
     scale_color_brewer(palette = 'Set1')
 
 # Size is deaths, world map
 world <- map_data('world')
 View(c_df)
+
+
 ggplot() +
     geom_map(data = world, map = world, aes(long, lat, map_id = region), 
              color = 'white', fill = 'gray50', alpha = .2) +
     geom_point(data = c_df, aes(longitude, latitude, color = as.factor(type_of_violence),
-                                size = best), 
+                                size = best, group = id), 
                alpha = .8) +
     theme() +
     scale_color_brewer(palette = 'Set1')
 
-# Now to map over time, see the David Robinson big mac series
-# Should be the same
 
-big_mac %>%
-    filter(!is.na(gdp_dollar)) %>% 
-    ggplot(aes(gdp_dollar, usd_adjusted))+
-    geom_point() +
-    geom_text_repel(aes(label = country)) +
-    geom_smooth(method = 'lm') + 
-    transition_time(date) +
-    labs(x = 'GDP per capita (dollars)', 
-         y = 'Raw Big Max Index relative to USD',
-         title = '{ frame_time }')
 
 # tibble
 c_df <- c_df %>% 
@@ -310,38 +269,79 @@ world <- map_data('world')
 # OMG It's working, had to group by ID becuase it was grouping by some other
 # factor. Now can we make our transitions smoother. As well as go moth to month?
 
+# Global over January '19
 z <- ggplot() +
     geom_map(data = world, map = world, aes(long, lat, map_id = region), 
              color = 'white', fill = 'gray50', alpha = .2) +
     geom_point(data = c_jan_19, aes(longitude, latitude, group = id, color = type_of_violence), 
                alpha = .8) +
-    scale_color_brewer(palette = 'Set1') +
     transition_time(date_start) +
     theme(legend.background = element_rect(fill = 'grey50', 
                                            size = .5, linetype = 2)) +
     labs(x = 'Longitude', 
          y = 'Latitude', 
-         title = '{ frame_time }') +
+         title = 'A Month In Conflict: { frame_time }') +
     enter_fade()
     
 animate(z, height = 800, width = 1000, nframes = 100)
 
-# Really love this plot, how can we immitate?
-data <- data.frame(
-    x = 1:10,
-    y = runif(10),
-    begin = runif(10, 1, 100),
-    length = runif(10, 5, 20),
-    enter = runif(10, 5, 10),
-    exit = runif(10, 5, 10)
-)
 
-anim <- ggplot(data, aes(x, y)) +
-    geom_col() +
-    transition_events(start = begin,
-                      end = begin + length,
-                      enter_length = enter,
-                      exit_length = exit) +
-    enter_grow() +
-    exit_drift(x_mod = 11) +
-    exit_fade()
+# Afghanistan -------------------------------------------------------------
+
+# Set up data frame
+# January only, Afghanistan only, change to dates, select specific columns
+c_jan_19_af <- c_df %>% 
+    filter(country == 'Afghanistan') %>%
+    select(id, best, latitude, longitude, side_a, side_b, date_start, date_end) %>% 
+    mutate(date_start = as.Date(date_start), date_end = as.Date(date_end)) %>% 
+    filter(date_start <= '2019-1-31' & date_start >= '2019-1-1') 
+
+# Get shapefile -- https://hub.arcgis.com/datasets/2b63527870ef416bacf83bcaf388685f_0/data
+afg_sf <- read_sf('data/afghanistan')
+
+# Plot afg animated and save to object
+afg <- ggplot() +
+    geom_sf(data = afg_sf, fill = 'gray50', alpha =.1) +
+    geom_point(data = c_jan_19_af, aes(longitude, latitude, group = id,
+                                       frame = date_start), 
+               alpha = .8, color = 'red', size = 2) +
+    transition_time(date_start) +
+    labs(x = 'Longitude', 
+         y = 'Latitude',
+         title = 'Afghanistan Conflict: {frame_time}') 
+    #enter_fade() + 
+    #exit_recolor(color = 'black')
+    #shadow_mark(color = 'black') # Keeps points on map
+
+# Useful cheat sheet - https://ugoproto.github.io/ugo_r_doc/pdf/gganimate.pdf
+
+# Animate afg object to the right size
+animate(afg, height = 800, width = 1000, nframes = 100)
+
+c_jan_19_af %>% 
+    count(id) 
+
+# Beautiful, needed ids and frame for plotly. Frame needs to be in numeric or prob character
+# maybe as.Date as.char
+afg <- 
+    ggplot(data = c_jan_19_af) +
+    geom_sf(data = afg_sf, fill = 'gray50', alpha =.1) +
+    geom_point(data = c_jan_19_af, aes(longitude, latitude, ids = id,
+                                       frame = as.character(date_start)),
+               alpha = .8, color = 'darkred', size = 1) +
+    labs(x = 'Longitude', 
+         y = 'Latitude',
+         title = 'Conflict in Afghanistan January 2019')
+
+# Plotly instead?
+afg <- ggplotly(afg)
+
+afg %>% 
+    animation_opts(
+        1000, easing = "linear", redraw = FALSE
+    )
+?animation_opts()
+c_jan_19_af
+
+# save it and we shall see
+htmlwidgets::saveWidget(afg, 'afg.html')
