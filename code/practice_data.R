@@ -336,11 +336,14 @@ afg <-
 # Plotly instead?
 afg <- ggplotly(afg)
 
+# Need to re-run to see if this fixes sizing - 
 afg %>% 
-    animation_opts(
-        1000, easing = "linear", redraw = FALSE
-    )
-?animation_opts()
+    animation_opts(1000, easing = "linear", redraw = FALSE) %>% 
+    layout(autosize = F, width = 500, height = 500, margin = m)
+
+
+
+
 c_jan_19_af
 
 # save it and we shall see
