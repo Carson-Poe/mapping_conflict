@@ -16,7 +16,7 @@ library(RJSONIO)
 library(r2d3)
 library(sf)
 library(ggplot2)
-theme_set(theme_bw())
+theme_set(theme_light())
 library(maps)
 library(scales)
 library(gganimate)
@@ -26,20 +26,62 @@ library(lubridate)
 library(knitr)
 library(tidymodels)
 
+
+
 ```
 
 # Mapping Global Conflict
 
-We will explore the data set from the [Upsalla Data Conflict Program](https://ucdp.uu.se/#/). 
 
-To start, download and clean the data. Then some light analysis and plotting. 
+
+We will explore a data set from the [Upsalla Data Conflict Program](https://ucdp.uu.se/#/). 
+The UDCP is one of the oldest and most robust datasets aggregating conflict events
+around the globe. To learn more about how the data is collected check out the 
+[University of Upsalla's](https://www.pcr.uu.se/research/ucdp/methodology/) methodology page. 
+
+
+
+To start, we will download and clean the data. Then some light analysis and plotting. 
 Finally, we will make a prediction using the insights we've gained. 
+
+
+## Get Oriented
+
+
+Here's a plot to get us oriented. 
+
+
+
+
+```{r warning=FALSE, message=FALSE, error=FALSE}
+# The World Map
+world <- map_data('world')
+
+# 
+ggplot() +
+    geom_map(data = world, map = world, aes(long, lat, map_id = region), 
+             color = 'white', fill = 'gray50', alpha = .2) +
+    geom_point(data = c_df, aes(longitude, latitude, color = as.factor(type_of_violence)), 
+               alpha = .8) +
+    theme(legend.title = element_text('Type of Violence')) +
+    labs(title = 'Conflict Events in 2019') +
+    scale_color_brewer(palette = 'Set1', labels = c('State Based', 'Non-State', 'One-Sided')) +
+    guides(color = guide_legend('Type of Violence'))
+
+```
+
+
+
+
 
 ## Download Data and Prep
 
-This is the nitty gritty of getting the data and putting it into a usable form. 
+
+This is the nitty-gritty of getting the data and putting it into a usable form. 
 An important step, but a tedious one to read through. 
 Feel free to skip ahead. 
+
+
 
 ```{r warning=FALSE, message=FALSE, error=FALSE}
 
@@ -140,9 +182,11 @@ c_df <- c_df %>%
 
 ## Explore
 
-Let's look at some stuff.
+
 
 ### Tables
+
+
 
 **Random Subset**
 ```{r warning=FALSE, message=FALSE, error=FALSE}
@@ -155,7 +199,11 @@ kable(c_df %>%
 
 ```
 
+
+
 **Most Events By Country**
+
+
 ```{r warning=FALSE, message=FALSE, error=FALSE}
 kable(c_df %>%
         add_count(country) %>% 
@@ -192,7 +240,10 @@ conflict event, but instead a collection of smaller events that are aggregated
 and reported at the end of the month. 
 
 
+
 **USA Involved**
+
+
 
 ```{r warning=FALSE, message=FALSE, error=FALSE}
 
@@ -204,7 +255,11 @@ kable(c_df %>%
 
 ```
 
+
+
 Doesn't appear to be a ton of direct US involvement in the 19 year old conflict with the Taliban. 
+
+
 
 
 ```{r warning=FALSE, message=FALSE, error=FALSE}
@@ -219,25 +274,77 @@ kable(c_df %>%
 
 ```
 
+
+
+
 So it appears the US itself isn't as active as the Afghanistan state military, 
 however considering the US spends [38 billion](https://comptroller.defense.gov/Portals/45/documents/Section1090Reports/Section_1090_FY17_NDAA_Cost_of_Wars_to_Per_Taxpayer-February_2020.pdf) (with a b) dollars in 2019 alone, well...
 
+
+
+
 **Civilian Deaths Globally**
+
 ```{r warning=FALSE, message=FALSE, error=FALSE}
 
 # How many?
 kable(c_df %>% 
     count(civ_cat) %>% 
-    arrange(n), caption = 'Civilian Deaths', col.names = c('Civilian Deaths', 'Number of Events'))
+    arrange(n), caption = 'Events With Civilian Deaths', col.names = c('Civilian Deaths', 'Number of Events'))
 
 
 ```
 
 
-## Including Plots
+
+
+
+```{r}
+
+# Table Civilian Involved Conflicts
+c_df %>% 
+    filter(side_b == 'Civilians') %>% 
+    mutate(date = floor_date(as.Date(date_start), unit = 'days')) %>% 
+    select(date, side_a, side_b, deaths_unknown, deaths_civilians, civ_cat) %>%
+    arrange(desc(deaths_civilians)) %>% 
+    head(10) %>% 
+    ggplot() +
+    geom_col(aes(x = factor(date), y = deaths_civilians, fill = side_a)) +
+    labs(x = 'Event Date', y = 'Civilian Deaths', 
+         title = 'Most Deaths in Events where Civilians Are Coded as Side B') +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.title = element_text('Side A'))
+
+
+```
+
+
+
+
+
+```{r}
+
+# How many?
+c_df %>% 
+    filter(side_b == 'Civilians') %>% 
+    mutate(side_a = abbreviate(side_a, minlength = 15)) %>% 
+    select(deaths_civilians, deaths_unknown, civ_cat, side_a, side_b) %>% 
+    count(side_a, sort = TRUE) %>% 
+    arrange(desc(n)) %>% 
+    head(10) %>% 
+    ggplot(aes(x = reorder(side_a, -n), y = n, fill = side_a)) +
+    geom_col() +
+    labs(x = 'Side A', y = 'Number of Events in 2019', 
+         title = 'Number of Civilian Coded Side B Events')+
+    theme(axis.text.x = element_text(angle = 45, hjust = 1), 
+          legend.position = 'none')
+
+```
+
+
 
 
 Average Deaths Per Conflict
+
 ```{r warning=FALSE, message=FALSE, error=FALSE}
 
 # Okay, loving this plot, group by country and rounded dates, sum deaths, plot
@@ -301,25 +408,8 @@ c_df %>%
 ```
 
 
+
 They appear to be the same.
-
-
-```{r warning=FALSE, message=FALSE, error=FALSE}
-# The World Map
-world <- map_data('world')
-
-# 
-ggplot() +
-    geom_map(data = world, map = world, aes(long, lat, map_id = region), 
-             color = 'white', fill = 'gray50', alpha = .2) +
-    geom_point(data = c_df, aes(longitude, latitude, color = as.factor(type_of_violence)), 
-               alpha = .8) +
-    theme(legend.title = element_text('Type of Violence')) +
-    labs(title = 'Global Violence') +
-    scale_color_brewer(palette = 'Set1', labels = c('State Based', 'Non-State', 'One-Sided')) +
-    guides(color = guide_legend('Type of Violence'))
-
-```
 
 
 
@@ -415,13 +505,24 @@ ind %>%
 
 ## Modeling
 
+
 We will build a random forest model to predict whether or not a conflict had 
 civilian deaths. 
+
 
 Then we will use the model to gauge if 'unknown' deaths were possibly mislabeled. 
 In order to do this, we're going to remove unknown deaths from the test/train set. 
 Then check if the 'unknown deaths' data set has around the same accuracy as the 
 test data set. 
+
+
+A discovery from our exploration that could affect us predicting civilian
+deaths, is that occasionally Side B is labeled as civilians. In order to keep the model
+from using side_b 'Civilian' labeling, we will not use 'side_b'. For the same
+reasoning, we will not use 'type of violence' as the third type, 'One Sided' means
+action against civlians.
+
+
 
 ```{r warning=FALSE, message=FALSE, error=FALSE}
 
@@ -431,18 +532,17 @@ no_unk_df <- c_df %>%
     filter(deaths_unknown == 0) %>%
     filter(country != 'Mexico', country != 'Brazil') %>% 
     mutate(date = as.Date(date_start)) %>% 
-    select(id, type_of_violence, conflict_new_id, date, side_a, 
-    side_b, number_of_sources, latitude, longitude, country, region, 
+    select(id, conflict_new_id, date, side_a,
+           number_of_sources, latitude, longitude, country, region, 
     event_clarity, deaths_a, deaths_b, civ_cat) %>% 
     mutate_if(is.character, factor) %>% 
-    mutate(type_of_violence = factor(type_of_violence), 
-           conflict_new_id = factor(conflict_new_id))
+    mutate(conflict_new_id = factor(conflict_new_id))
 
 
 ```
 
 
-
+Split data into test and training.
 
 ```{r warning=FALSE, message=FALSE, error=FALSE}
 
@@ -454,7 +554,7 @@ c_test <- testing(c_split)
 
 ```
 
-
+Prepare our data.
 
 ```{r warning=FALSE, message=FALSE, error=FALSE}
 
@@ -463,7 +563,7 @@ c_rec <- recipe(civ_cat ~ ., data = c_train) %>%
     # Make ID be an id
     update_role(id, new_role = 'id') %>% 
     # Reduce categories
-    step_other(side_a, side_b, country, conflict_new_id, threshold = .02) %>% 
+    step_other(side_a, country, conflict_new_id, threshold = .02) %>% 
     # turn all categories into numbers
     step_dummy(all_nominal(), -all_outcomes()) %>% 
     # Use week
@@ -475,11 +575,15 @@ c_rec <- recipe(civ_cat ~ ., data = c_train) %>%
 
 # prep our data
 c_prep <- prep(c_rec)
-?prep
+
 # Take a look at new data
-knitr::kable(juice(c_prep), align = 'c', caption = 'Prepped for Modeling')
+knitr::kable(juice(c_prep) %>% sample_n(5) %>% select(1:10), align = 'c', caption = 'Prepped for Modeling, A Few Columns')
 
 ```
+
+
+Prepare our tuning specification. In this case we will tune the number of predictors to sample at 
+each split, as well as the number of data points required to be in a node to be split further.
 
 
 ```{r warning=FALSE, message=FALSE, error=FALSE}
@@ -497,6 +601,8 @@ tune_spec <- rand_forest(
 ```
 
 
+
+
 ```{r warning=FALSE, message=FALSE, error=FALSE}
 
 # Set our workflow
@@ -505,6 +611,8 @@ tune_wf <- workflow() %>%
     add_model(tune_spec)
 
 ```
+
+
 
 
 ```{r warning=FALSE, message=FALSE, error=FALSE}
@@ -534,6 +642,7 @@ knitr::kable(round(time.taken), col.names = 'Time to Fit')
 
 
 
+
 ```{r warning=FALSE, message=FALSE, error=FALSE}
 
 # Plot of CV Tuned Hyperparameters
@@ -553,6 +662,12 @@ tune_res %>%
 ```
 
 
+The plot above shows our Roc Area Under the Curve at different hyperparameters
+levels. 
+
+
+We pick the best hyperparameters from the tuning above and fit our final model. 
+
 
 ```{r warning=FALSE, message=FALSE, error=FALSE}
 
@@ -566,6 +681,10 @@ final_rf <- finalize_model(
 )
 
 ```
+
+
+Check the importance of our variables. 
+
 
 ```{r warning=FALSE, message=FALSE, error=FALSE}
 
@@ -584,10 +703,13 @@ final_rf %>%
 ```
 
 
-The deaths are the most important variables for predicting civilian causualties. 
-Specifically the deaths of 'side_b'. It's hard to say exactly why. Is it becuase
-with higher deaths from side B there's more likely to be civilian causualties? Or
-is it becuase civilian deaths can be lumbed in with side_b, leading to 'no' civilian deaths but high side_b deaths? This is, of course, complete and uniformed conjecture. 
+
+The deaths are the most important variables for predicting civilian casualties. 
+Specifically the deaths of 'side_b'. It's hard to say exactly why. Is it because
+with higher deaths from side B there's more likely to be civilian casualties? Or
+is it because civilian deaths can be lumped in with side_b, leading to 'no' civilian deaths but high side_b deaths? This is, of course, complete and uniformed conjecture. 
+
+
 
 
 ```{r warning=FALSE, message=FALSE, error=FALSE}
@@ -614,7 +736,7 @@ testing_accuracy <- final_res %>%
 
 # Look at our metrics
 knitr::kable(final_res %>% 
-    collect_metrics(), align ='c', caption = 'Metrics')
+    collect_metrics() %>% mutate(.estimate = round(.estimate, 3)), align ='c', caption = 'Metrics')
 
 ```
 
@@ -689,12 +811,11 @@ unk <- c_df %>%
     filter(deaths_unknown > 0) %>% 
     filter(country != 'Mexico', country != 'Brazil') %>% 
     mutate(date = as.Date(date_start)) %>% 
-    select(id, type_of_violence, conflict_new_id, date, side_a, 
-    side_b, number_of_sources, latitude, longitude, country, region, 
+    select(id, conflict_new_id, date, side_a, 
+    number_of_sources, latitude, longitude, country, region, 
     event_clarity, deaths_a, deaths_b, civ_cat) %>% 
     mutate_if(is.character, factor) %>% 
-    mutate(type_of_violence = factor(type_of_violence), 
-           conflict_new_id = factor(conflict_new_id))
+    mutate(conflict_new_id = factor(conflict_new_id))
 
 
 ```
@@ -773,6 +894,11 @@ knitr::kable(compared_perc, alight = 'c', caption = 'Accuracy of Model on Unknow
 
 
 **Thank you, and feel free to contact me through github with any questions, errors,**
-**or to have a chat.**
+**or comments.**
 
 -Carson Poe
+
+
+*This project was heavily inspired by [David Robinson](http://varianceexplained.org/about/)* 
+*and [Julia Silge](https://juliasilge.com/about/). Thank you for the inspirational*
+*tutorials!*
