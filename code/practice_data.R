@@ -390,7 +390,14 @@ htmlwidgets::saveWidget(ind, 'india.html')
 
 # Use strata
 
+
+# Oh shoot, there's a civilian side. FROM THE TOP!  -----------------------
+
+
+
 # How many?
 c_df %>% 
-    count(civ_cat)
+    filter(side_b == 'Civilians') %>% 
+    select(deaths_civilians, deaths_unknown, civ_cat, side_a, side_b) %>% 
+    count(side_a, sort = TRUE)
 
