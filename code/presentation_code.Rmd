@@ -1,0 +1,692 @@
+---
+title: "For Presentation"
+author: "Carson Poe"
+date: "4/24/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(knitr)
+library(kableExtra)
+
+```
+
+# Load
+
+```{r }
+
+load(file = 'C:/Users/Car/Desktop/Messing Around/Exploration Mapping/mapping_conflict/data/conflict_19.Rds')
+
+
+```
+
+
+
+## World Plot
+
+```{r warning=FALSE, message=FALSE, error=FALSE}
+
+world <- map_data('world')
+
+# Okay, kinda like, civilian deaths mapped globally
+world_civ <- ggplot() +
+    geom_map(data = world, map = world, aes(long, lat, map_id = region), 
+             color = 'white', fill = 'gray50', alpha = .5) +
+    geom_point(data = c_df, aes(longitude, latitude, 
+                                color = as.factor(civ_cat), 
+                                group = id), alpha = .7) +
+    theme(axis.ticks = element_blank(),
+          axis.text = element_blank(),
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank()) +
+    scale_color_manual(values = c('no' = 'darkblue', 'yes' = 'red'), 
+                       labels = c('No', 'Yes')) +
+    labs(title = 'Civilian Deaths in Conflict Events (2019)', x ='', y= '') +
+    guides(color = guide_legend('Civilian Deaths', reverse = TRUE))
+
+ggsave('world_civ.png', plot = world_civ, path = "C:/Users/Car/Desktop/Messing Around/Exploration Mapping/mapping_conflict/figures/", dpi = 300, units = 'in', width = 12, height = 8)
+
+```
+
+## Sample of Data
+```{r}
+set.seed(48)
+samp <- kable(c_df %>% 
+    filter(best > 10) %>%
+    sample_n(5) %>% 
+    mutate(date_start = date(date_start)) %>%
+    select(date_start, country, side_a, side_b, best, civ_cat, unk_cat), 
+    col.names = c('Date', 'Country', 'Side A', 'Side B', 'Deaths', 'Civilian Causualties', 'Unknown Casualties'), align = 'c') %>% 
+    column_spec(2:3, width = '5cm') %>% 
+    column_spec(6:7, width = '3cm')
+
+save_kable(samp, file = "figures/sample_row.png", self_contained = TRUE)
+
+```
+
+## Total Deaths by country
+
+```{r warning=FALSE, message=FALSE, error=FALSE}
+most_by <- kable(c_df %>%
+        add_count(country) %>% 
+        group_by(country) %>% 
+        summarise(country = country, total_estimated = sum(best), n = n) %>%
+        distinct() %>% 
+        select(country, n, total_estimated) %>% 
+        ungroup() %>% 
+        arrange(desc(total_estimated)) %>% 
+        head(10), col.names = c('Conflict Location', 'Total Events', 'Total Deaths'), align = 'c', caption = 'Total Conflict Deaths by Country (2019)') %>% 
+        column_spec(1:3, width = '3cm')
+
+new_df <- c_df %>%
+        add_count(country) %>% 
+        group_by(country, region) %>% 
+        summarise(country = country, total_estimated = sum(best), n = n) %>%
+        distinct() %>% 
+        select(country, n, total_estimated, region) %>% 
+        ungroup() %>% 
+        arrange(desc(total_estimated)) %>% 
+        head(20) 
+
+total_deaths <- new_df %>% 
+    filter(country != 'Afghanistan') %>% 
+    mutate(country = fct_reorder(country, total_estimated)) %>% 
+    ggplot(aes(x = total_estimated, y = country, color = region)) +
+    geom_segment(aes(x = 0, y = country, xend = total_estimated, yend = country), size = 1)+
+    geom_point(size = 1.8) +
+    xlab(label = 'Total Deaths') +
+    ylab(label = 'Country') +
+    scale_color_discrete(name = 'Region')
+
+
+save_kable(most_by, file = "figures/most_by_country.png", self_contained = TRUE)
+
+ggsave('total_deaths.png', plot = total_deaths, path = "C:/Users/Car/Desktop/Messing Around/Exploration Mapping/mapping_conflict/figures/", dpi = 300, units = 'in', width = 12, height = 8)
+
+```
+
+# Plot of deaths per Month
+
+```{r warning=FALSE, message=FALSE, error=FALSE}
+theme_set(theme_b)
+# Okay, loving this plot, group by country and rounded dates, sum deaths, plot
+# Filtering by more than 300 events here.
+per_month_facet <- c_df %>% 
+    add_count(country) %>% 
+    filter(n > 240) %>% 
+    mutate(rounded_date = floor_date(as.Date(date_start), unit = 'month')) %>% 
+    group_by(country, rounded_date) %>% 
+    mutate(sum_deaths = sum(best)) %>% 
+    select(country, sum_deaths, rounded_date) %>% 
+    ggplot(aes(rounded_date, sum_deaths, color = country)) +
+    geom_line() +
+    theme(axis.text.x = element_text(angle = 45, vjust = .5), legend.position = 'none') +
+    labs(x = '', y = 'Total Deaths', title = 'Conflict Deaths Per Month For Countries with Greater then 240 Events') +
+    facet_wrap(~country, scales = 'free_y')
+
+ggsave('per_month_facet.png', plot = per_month_facet, path = "C:/Users/Car/Desktop/Messing Around/Exploration Mapping/mapping_conflict/figures/", dpi = 300, units = 'in', width = 12, height = 8)
+
+```
+
+
+
+
+
+
+```{r}
+
+
+# How many?
+civ_unk_count <- kable(c_df %>% 
+    count(civ_cat, unk_cat) %>% 
+    arrange(desc(n)), caption = 'Events With Civilian Deaths', col.names = c('Civilian Deaths | ', 'Unknown Deaths | ', 'Count'), 
+    align = 'c') 
+
+save_kable(civ_unk_count, file = "figures/civ_unk.count.png", self_contained = TRUE)
+
+
+
+
+```
+
+
+
+
+
+```{r warning=FALSE, message=FALSE, error=FALSE}
+top_events <- kable(c_df %>% 
+        select(date_start, country, side_a, side_b, deaths_a, deaths_b, deaths_unknown, best, civ_cat) %>%
+        arrange(desc(best)) %>%
+        mutate(date_start = date(date_start)) %>% 
+        head(8), 
+        col.names = c('Date', 'Conflict Location', 'Side A', 'Side B', 'Deaths A', 'Deaths B', 'Unknown Deaths', 'Best Estimate for Total Deaths', 'Civilian Causualties'), 
+        align = 'c', 
+        caption = 'Largest Death Count per Conflict Event (2019)')
+
+save_kable(top_events, file = "figures/top_events.png")
+
+```
+
+
+```{r}
+
+c_df %>% 
+    group_by(side_a ,side_b) %>% 
+    summarise(total_deaths = sum(best)) %>% 
+    arrange(desc(total_deaths))
+
+```
+
+
+
+```{r}
+
+avg_death_per <- c_df %>% 
+    select(country, best, date_start, region, best) %>% 
+    filter(best < 700) %>% 
+    add_count(country) %>% 
+    filter(n > 100) %>% 
+    group_by(country) %>% 
+    mutate(average = (sum(best)/n), sum_deaths = sum(best)) %>% 
+    select(-best, -date_start) %>% 
+    # Seems like a cheater way to limit number of rows
+    summarise(region = unique(region),
+          n = max(n), 
+          average = max(average),
+          sum_deaths = max(sum_deaths)) %>% 
+    mutate(country = fct_reorder(country, -average)) %>% 
+    ggplot(aes(country, average, fill = country))+
+    geom_col() +
+    geom_text(aes(label = paste0('n= ', n), angle = 90), hjust = 'top') +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position =  'none') +
+    labs(x = 'Country', title = 'Average Deaths per Violent Encounter 2019', y = 'Average Deaths') +
+    scale_y_continuous(n.breaks = 8)
+
+ggsave('avg_death_per.png', plot = avg_death_per, path = "C:/Users/Car/Desktop/Messing Around/Exploration Mapping/mapping_conflict/figures/", dpi = 300, units = 'in', width = 12, height = 8)
+
+```
+
+
+```{r}
+
+
+# Set up data frame
+# January only, Afghanistan only, change to dates, select specific columns
+c_df_af <- c_df %>% 
+    filter(country == 'Afghanistan') %>%
+    mutate(month = factor(floor_date(date(date_start), unit = 'month'))) %>% 
+    select(id, best, latitude, longitude, side_a, side_b, date_start, date_end, month)
+
+# Get shapefile -- https://hub.arcgis.com/datasets/2b63527870ef416bacf83bcaf388685f_0/data
+afg_sf <- read_sf('code/afghanistan')
+
+
+# Beautiful, needed ids and frame for plotly. Frame needs to be in numeric or prob character
+# maybe as.Date as.char
+afg <- 
+    ggplot(data = c_df_af) +
+    geom_sf(data = afg_sf, fill = 'gray50', alpha =.1) +
+    geom_point(data = c_df_af, aes(longitude, latitude),
+               alpha = .8, color = 'darkred', size = 1) +
+    labs(title = 'Conflict in Afghanistan 2019') +
+    theme_void()
+
+ggsave('afg.png', plot = afg, path = "C:/Users/Car/Desktop/Messing Around/Exploration Mapping/mapping_conflict/figures/", dpi = 300, units = 'in', width = 12, height = 8)
+
+```
+
+
+
+```{r}
+
+
+# Set up data frame
+# January only, Afghanistan only, change to dates, select specific columns
+c_df_in <- c_df %>% 
+    filter(country == 'India') %>%
+    mutate(month = factor(floor_date(date(date_start), unit = 'month'))) %>% 
+    select(id, best, latitude, longitude, side_a, side_b, date_start, date_end, month)
+
+# Get shapefile -- https://hub.arcgis.com/datasets/2b63527870ef416bacf83bcaf388685f_0/data
+in_sf <- read_sf('code/india')
+
+
+# Beautiful, needed ids and frame for plotly. Frame needs to be in numeric or prob character
+# maybe as.Date as.char
+ind <- 
+    ggplot(data = c_df_in) +
+    geom_sf(data = in_sf, fill = 'gray50', alpha =.1) +
+    geom_point(data = c_df_in, aes(longitude, latitude),
+               alpha = .8, color = 'darkred', size = 1) +
+    labs(title = 'Conflict in India 2019') +
+    theme_void()
+
+ggsave('ind.png', plot = ind, path = "C:/Users/Car/Desktop/Messing Around/Exploration Mapping/mapping_conflict/figures/", dpi = 300, units = 'in', width = 12, height = 8)
+
+
+```
+
+```{r}
+
+c_df_mex <- c_df %>% 
+    filter(country == 'Mexico') %>%
+    mutate(month = factor(floor_date(date(date_start), unit = 'month'))) %>% 
+    select(id, best, latitude, longitude, side_a, side_b, date_start, date_end, month)
+
+mex_sf <- read_sf('code/mexico')
+
+mex <- 
+    ggplot(data = c_df_mex) +
+    geom_sf(data = mex_sf, fill = 'gray50', alpha =.1) +
+    geom_point(data = c_df_mex, aes(longitude, latitude),
+               alpha = .8, color = 'darkred', size = 1) +
+    labs(title = 'Conflict in Mexico 2019') +
+    theme_void()
+
+ggsave('mex.png', plot = mex, path = "C:/Users/Car/Desktop/Messing Around/Exploration Mapping/mapping_conflict/figures/", dpi = 300, units = 'in', width = 12, height = 8)
+
+```
+
+
+# Modeling
+
+```{r}
+
+
+# Create groups for when there's unknown deaths, then plot. 
+same_dist <- c_df %>% 
+    mutate(un_cat = case_when(deaths_unknown > 0 ~ 'Yes',
+                              TRUE ~ 'No')) %>% 
+    filter(best < 75) %>% 
+    ggplot(aes(best, fill = un_cat)) +
+    geom_density(alpha = .5) +
+    labs(x = 'Estimated Deaths', y = 'Number of Events',
+         title = 'Events With Unknown Deaths') +
+    scale_fill_discrete(name = 'Unkown Deaths')
+
+ggsave('same_dist.png', plot = same_dist, path = "C:/Users/Car/Desktop/Messing Around/Exploration Mapping/mapping_conflict/figures/", dpi = 300, units = 'in', width = 12, height = 8)
+
+```
+
+
+```{r}
+
+# with unknown deaths. 
+prop <- c_df %>%   
+    count(country, unk_cat) %>% 
+    group_by(country) %>% 
+    mutate(proportion = (n / sum(n))) %>% 
+    filter(n > 10) %>%
+    filter(unk_cat == 'yes') %>% 
+    select(country, proportion) %>% 
+    ggplot(aes(country, proportion)) +
+    geom_col(position = 'stack', fill = '#DB4914') +
+    theme(legend.title = element_text('Unkown Deaths'), 
+           axis.text.x = element_text(angle = 90, hjust = 1, vjust = 0)) +
+    labs(title = 'Proportion of Events with Unknown Deaths') +
+    scale_y_continuous(labels = scales::percent_format()) +
+    ylab(label = 'Proportion') +
+    xlab(label = 'Country')
+
+ggsave('prop.png', plot = prop, path = "C:/Users/Car/Desktop/Messing Around/Exploration Mapping/mapping_conflict/figures/", dpi = 300, units = 'in', width = 12, height = 8)
+
+```
+
+
+
+```{r}
+
+
+world <- map_data('world')
+
+# Okay, kinda like, civilian deaths mapped globally
+world_unk <- ggplot() +
+    geom_map(data = world, map = world, aes(long, lat, map_id = region), 
+             color = 'white', fill = 'gray50', alpha = .5) +
+    geom_point(data = c_df, aes(longitude, latitude, 
+                                color = as.factor(unk_cat), 
+                                group = id), alpha = .7) +
+    theme(axis.ticks = element_blank(),
+          axis.text = element_blank(),
+          panel.grid.major = element_blank(),
+          panel.grid.minor = element_blank()) +
+    scale_color_manual(values = c('no' = 'darkblue', 'yes' = '#E69F00'), 
+                       labels = c('No', 'Yes')) +
+    labs(title = 'Unknown Deaths in Conflict Events (2019)', x ='', y= '') +
+    guides(color = guide_legend('Unknown Deaths', reverse = TRUE))
+
+ggsave('world_unk.png', plot = world_unk, path = "C:/Users/Car/Desktop/Messing Around/Exploration Mapping/mapping_conflict/figures/", dpi = 300, units = 'in', width = 12, height = 8)
+
+
+```
+
+
+
+
+Remove Unkowns - Set Aside
+
+```{r warning=FALSE, message=FALSE, error=FALSE}
+
+# Get all data we pulled from earlier
+unk <- c_df %>% 
+    filter(deaths_unknown > 0) %>% 
+    filter(country != 'Mexico', country != 'Brazil') %>% 
+    mutate(date = as.Date(date_start)) %>% 
+    select(id, date, side_a, 
+    number_of_sources, latitude, longitude, country, 
+    event_clarity, deaths_a, deaths_b, civ_cat, number_of_sources, word_count) %>% 
+    mutate_if(is.character, factor) 
+
+```
+
+Build Model
+
+```{r warning=FALSE, message=FALSE, error=FALSE}
+
+# Step one, filter out Unknowns, set up data frame. Becuase of a prediction we will
+# be attempting later, we will remove Brazil and Mexico. 
+no_unk_df <- c_df %>% 
+    filter(deaths_unknown == 0) %>%
+    filter(country != 'Mexico', country != 'Brazil') %>% 
+    mutate(date = as.Date(date_start)) %>% 
+    select(id, date, side_a,
+           number_of_sources, latitude, longitude, country, 
+    event_clarity, deaths_a, deaths_b, civ_cat, number_of_sources, word_count) %>% 
+    mutate_if(is.character, factor) 
+
+
+```
+
+
+
+Split data into test and training.
+
+```{r warning=FALSE, message=FALSE, error=FALSE}
+
+# Create training and testing sets
+set.seed(715)
+c_split <- initial_split(no_unk_df, strata = civ_cat)
+c_train <- training(c_split)
+c_test <- testing(c_split)
+
+```
+
+Prepare our data.
+
+```{r warning=FALSE, message=FALSE, error=FALSE}
+
+# set up our recipe using training data
+c_rec <- recipe(civ_cat ~ ., data = c_train) %>% 
+    # Make ID be an id
+    update_role(id, new_role = 'id') %>% 
+    # Reduce categories
+    step_other(side_a, country, threshold = .01) %>% 
+    # Use week
+    step_date(date, features = 'week') %>% 
+    # Rm complete date
+    step_rm(date) %>% 
+    # downsample the civilian deaths
+    themis::step_downsample(civ_cat)
+
+# prep our data
+c_prep <- prep(c_rec)
+
+# Take a look at new data
+prepped <- kable(juice(c_prep) %>% sample_n(5) %>% select(1:10), 
+                        align = 'c', caption = 'Prepped for Modeling, A Few Columns')
+
+
+save_kable(prepped, file = "figures/prepped.png", self_contained = TRUE)
+
+```
+
+
+Prepare our tuning specification. In this case we will tune the number of predictors to sample at 
+each split, as well as the number of data points required to be in a node to be split further.
+
+
+```{r warning=FALSE, message=FALSE, error=FALSE}
+
+# Set our random forest model specification
+tune_spec <- rand_forest(
+    mtry = tune(),
+    trees = 1000,
+    min_n = tune()
+    ) %>% 
+    set_mode('classification') %>% 
+    set_engine('ranger')
+
+
+```
+
+
+
+
+```{r warning=FALSE, message=FALSE, error=FALSE}
+
+# Set our workflow
+tune_wf <- workflow() %>% 
+    add_recipe(c_rec) %>% 
+    add_model(tune_spec)
+
+```
+
+
+
+
+```{r warning=FALSE, message=FALSE, error=FALSE}
+
+# Train on our CV
+start.time <- Sys.time()
+
+set.seed(234)
+
+c_folds <- vfold_cv(c_train)
+
+doParallel::registerDoParallel()
+
+# This takes time
+tune_res <- tune_grid(
+    tune_wf, 
+    resamples = c_folds,
+    grid = 20
+)
+
+# For timing
+end.time <- Sys.time()
+time.taken <- end.time - start.time
+knitr::kable(round(time.taken), col.names = 'Time to Fit')
+
+```
+
+
+
+
+```{r warning=FALSE, message=FALSE, error=FALSE}
+
+# Plot of CV Tuned Hyperparameters
+auc_plot <- tune_res %>% 
+    collect_metrics() %>% 
+    filter(.metric == 'roc_auc') %>% 
+    pivot_longer(cols = c('min_n', 'mtry'), names_to = 'tuned',
+                 values_to = 'tune_val') %>%
+    ggplot(aes(tune_val, mean, color = tuned)) +
+    geom_line(alpha = .8, size = 1.5) +
+    geom_point() +
+    scale_x_continuous(breaks = seq(10,40,2)) +
+    facet_wrap(~tuned, scales = 'free') +
+    labs(x = 'Value of Tuned Hyperparameter', y = 'Avg AUC (ROC)') +
+    theme_bw() +
+    theme(legend.position = 'none')
+
+ggsave('auc_plot.png', plot = auc_plot, path = "C:/Users/Car/Desktop/Messing Around/Exploration Mapping/mapping_conflict/figures/", dpi = 300, units = 'in', width = 12, height = 8)
+
+```
+
+
+The plot above shows our Roc Area Under the Curve at different hyperparameters
+levels. 
+
+
+We pick the best hyperparameters from the tuning above and fit our final model. 
+
+
+```{r warning=FALSE, message=FALSE, error=FALSE}
+
+# Select Best Specifications Based on Roc Auc
+best_auc <- select_best(tune_res, 'roc_auc')
+
+# Finalize model w/tuned Hyperparmeters 
+final_rf <- finalize_model(
+    tune_spec, 
+    best_auc
+)
+
+```
+
+
+Check the importance of our variables. 
+
+
+```{r warning=FALSE, message=FALSE, error=FALSE}
+
+# Variable Importance Plots
+library(vip)
+
+# VIP Plot
+var_imp <- final_rf %>% 
+    set_engine('ranger', importance = 'permutation') %>% 
+    fit(civ_cat~ .,
+        data = juice(c_prep) %>% select(-id)) %>% 
+    vip(geom = 'point') +
+    labs(title = 'Variable Importance')
+
+ggsave('var_imp.png', plot = var_imp, path = "C:/Users/Car/Desktop/Messing Around/Exploration Mapping/mapping_conflict/figures/", dpi = 300, units = 'in', width = 12, height = 8)
+```
+
+
+
+```{r warning=FALSE, message=FALSE, error=FALSE}
+
+# Final workflow, with recipe and final model. 
+final_wf <- workflow() %>% 
+    add_recipe(c_rec) %>% 
+    add_model(final_rf)
+
+```
+
+
+
+```{r warning=FALSE, message=FALSE, error=FALSE}
+# last_fit does a final fit on training data, then evaluates on testing data
+final_res <- final_wf %>% 
+    last_fit(c_split)
+
+# Save testing accuracy for later
+testing_accuracy <- final_res %>% 
+    collect_metrics() %>% 
+    filter(.metric == 'accuracy') %>% 
+    select(.estimate)
+
+# Look at our metrics
+knitr::kable(final_res %>% 
+    collect_metrics() %>% mutate(.estimate = round(.estimate, 3)), align ='c', caption = 'Metrics')
+
+```
+
+
+
+Not bad. 
+
+```{r warning=FALSE, message=FALSE, error=FALSE}
+# Glance at predictions
+pred_no_civ <- knitr::kable(final_res %>% 
+    collect_predictions() %>% filter(.pred_yes > .9) %>%  filter(civ_cat == 'no') %>% arrange(desc(.pred_yes)) %>% head(10), align ='c', caption = 'Predictions', digits = 3)
+
+
+save_kable(pred_no_civ, file = "C:/Users/Car/Desktop/Messing Around/Exploration Mapping/mapping_conflict/figures/pred_no_civ.png")
+
+```
+
+Well that built us a model. Now can we  use it on the 'unknown' deaths to predict
+which ones might have had civilian casualties?
+
+
+Our predictable unknown data is reduced from 1550 to 611 when we remove Brazil and Mexico. Again, as a reminder, we're assuming there's no such 'real' category of 
+unknown casualties: casualties either come from civilians or combatants. So,
+we're using our model to predict civilian casualties on events with unknown deaths. 
+
+
+```{r warning=FALSE, message=FALSE, error=FALSE}
+# Final fit used on training data
+completed <- final_wf %>% 
+    fit(c_train)
+
+# Transform our new 'unknowns' data into same as model
+unk_baked <- bake(prep(c_rec), unk)
+
+# Pull out model
+my_model <- completed %>% 
+    pull_workflow_fit()
+
+# Make predictions
+predicted_unknowns <- predict(my_model, new_data = unk_baked) %>% 
+    cbind(unk, .)
+
+# Get column of unknown deaths
+unk_deaths <- select(c_df, id, deaths_unknown)
+
+# Add our Unknown deaths back, and keep only relevant data. 
+pred_short <- predicted_unknowns %>% 
+    left_join(x = ., y = unk_deaths, by = 'id') %>% 
+    select(id, country, deaths_unknown, civ_cat, .pred_class)
+
+set.seed(48)
+pred_mis <- knitr::kable(pred_short %>% sample_n(8), align = 'c', caption = 'Unknown Deaths, Civilian Deaths and Civ Death Predictions')
+
+save_kable(pred_mis, file = "C:/Users/Car/Desktop/Messing Around/Exploration Mapping/mapping_conflict/figures/pred_mis.png")
+
+```
+
+There appears to be some mismatch between the civilian deaths category and our predictions. 
+Assuming our model retains it's accuracy on our 'new' data, we postulate that
+there should be about a 90% accuracy rate. 
+
+```{r warning=FALSE, message=FALSE, error=FALSE}
+# Get our accuracy on our new data
+unknown_accuracy <- sum(pred_short$civ_cat == pred_short$.pred_class) / nrow(pred_short)
+
+# Create dataframe for plot
+compared_perc <- data.frame(acc = c('Unknown Accuracy', 'Testing Accuracy'), 
+                  perc = c(scales::percent(unknown_accuracy), scales::percent(pull(testing_accuracy))))
+
+# No perc
+compared <- data.frame(acc = c('Unknown Accuracy', 'Testing Accuracy'), 
+                  perc = c(unknown_accuracy, pull(testing_accuracy)))
+
+# Plot
+accuracy_comp <- ggplot(compared) +
+    geom_col(aes(x = acc, y = perc, fill = acc)) +
+    labs(x = '', y = 'Percent Accurate', title = 'Accuracy of Our Two Sets',
+         subtitle = 'Model Testing Set vs. Unknown Deaths Set') +
+    theme(legend.position = 'none') +
+    scale_y_continuous(limits = c(0, 1), labels = percent)
+
+ggsave('accuracy_comp.png', plot = accuracy_comp, path = "C:/Users/Car/Desktop/Messing Around/Exploration Mapping/mapping_conflict/figures/", dpi = 300, units = 'in', width = 12, height = 8)
+
+```
+
+This tells me two things, of which either, or both, could be true.
+
+One, using the model on the unknown subset made for highly inaccurate predictions
+on the civilian deaths category. 
+
+Or two, the 'unknown' deaths have an unusually high inaccurate labeling of 
+civilian casualties. 
+
+
+```{r warning=FALSE, message=FALSE, error=FALSE}
+knitr::kable(compared_perc, alight = 'c', caption = 'Accuracy of Model on Unknowns vs Testing Data')
+```
