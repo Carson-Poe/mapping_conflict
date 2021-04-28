@@ -1,1 +1,9 @@
-# Mapping and Data Exploration 
+# Upsalla Conflict Project 
+
+An Exploration, by Carson Poe
+
+Find the data here - 
+https://www.pcr.uu.se/research/ucdp/
+
+An interactive demo dashboard created by me-
+https://carsonpoe.shinyapps.io/conflict-demo/

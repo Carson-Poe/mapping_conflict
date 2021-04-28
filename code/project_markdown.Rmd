@@ -4,7 +4,7 @@ author: "Carson Poe"
 date: "12/28/2020"
 output: html_document
 editor_options: 
-  chunk_output_type: inline
+  chunk_output_type: console
 ---
 
 ```{r setup, include=FALSE}
@@ -23,7 +23,7 @@ library(gganimate)
 library(plotly)
 library(ggplot2)
 library(lubridate)
-library(knitr)
+library(knitr) #need
 library(tidymodels)
 
 
@@ -84,7 +84,7 @@ Feel free to skip ahead.
 
 
 ```{r warning=FALSE, message=FALSE, error=FALSE}
-
+setwd(x)
 
 # get data
 prac <- fromJSON('https://ucdpapi.pcr.uu.se/api/gedevents/20.1?pagesize=1000&StartDate=2019-01-01&EndDate=2019-12-31')
@@ -177,7 +177,7 @@ c_df <- c_df %>%
 
 # Save file for later use
 #save(c_df, "data/conflict_19.Rds")
-#load(file = "data/conflict_19.Rds")
+load(file = 'C:/Users/Car/Desktop/Messing Around/Exploration Mapping/mapping_conflict/data/conflict_19.Rds')
 ```
 
 ## Explore
@@ -309,10 +309,11 @@ c_df %>%
     arrange(desc(deaths_civilians)) %>% 
     head(10) %>% 
     ggplot() +
-    geom_col(aes(x = factor(date), y = deaths_civilians, fill = side_a)) +
+    geom_col(aes(x = side_a, y = deaths_civilians, fill = side_a)) +
     labs(x = 'Event Date', y = 'Civilian Deaths', 
          title = 'Most Deaths in Events where Civilians Are Coded as Side B') +
     theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.title = element_text('Side A'))
+    
 
 
 ```
@@ -336,7 +337,8 @@ c_df %>%
     labs(x = 'Side A', y = 'Number of Events in 2019', 
          title = 'Number of Civilian Coded Side B Events')+
     theme(axis.text.x = element_text(angle = 45, hjust = 1), 
-          legend.position = 'none')
+          legend.position = 'none') 
+    
 
 ```
 
@@ -501,6 +503,7 @@ ind %>%
 
 
 ```
+
 
 
 ## Modeling
